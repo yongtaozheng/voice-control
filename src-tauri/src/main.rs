@@ -55,7 +55,11 @@ impl DaemonManager {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .map_err(|err| format!("failed to spawn node daemon: {err}"))?;
+            .map_err(|err| {
+                format!(
+                    "failed to spawn node daemon: {err}. ensure Node.js 18.x is installed and on PATH"
+                )
+            })?;
 
         let stdin = child.stdin.take().ok_or("failed to capture daemon stdin")?;
         let stdout = child
