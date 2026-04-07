@@ -1,0 +1,16 @@
+[package]
+name = "voice-control-tauri"
+version = "0.1.0"
+description = "Voice control desktop app powered by Tauri"
+authors = ["OpenCow"]
+license = "MIT"
+repository = ""
+edition = "2021"
+rust-version = "1.77"
+
+[build-dependencies]
+tauri-build = { version = "1.5" }
+
+[dependencies]
+serde_json = "1"
+tauri = { version = "1.8", features = ["api-all", "system-tray"] }

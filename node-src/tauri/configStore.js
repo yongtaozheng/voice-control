@@ -1,6 +1,7 @@
 "use strict";
 
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 
 const DEFAULT_CONFIG = Object.freeze({
@@ -12,8 +13,21 @@ const DEFAULT_CONFIG = Object.freeze({
   phraseMapFile: ""
 });
 
-function loadConfig(app) {
-  const filePath = getConfigPath(app);
+function resolveUserDataDir(input = null) {
+  const raw = input || process.env.VC_USER_DATA_DIR;
+  if (raw && String(raw).trim()) {
+    return path.resolve(String(raw).trim());
+  }
+  return path.join(os.homedir(), ".voice-control-node");
+}
+
+function getConfigPath({ userDataDir = null } = {}) {
+  const dir = resolveUserDataDir(userDataDir);
+  return path.join(dir, "voice-control-config.json");
+}
+
+function loadConfig({ userDataDir = null } = {}) {
+  const filePath = getConfigPath({ userDataDir });
   if (!fs.existsSync(filePath)) {
     return { ...DEFAULT_CONFIG };
   }
@@ -27,15 +41,12 @@ function loadConfig(app) {
   }
 }
 
-function saveConfig(app, config) {
-  const filePath = getConfigPath(app);
+function saveConfig(config, { userDataDir = null } = {}) {
+  const filePath = getConfigPath({ userDataDir });
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const safeConfig = sanitizeConfig(config);
   fs.writeFileSync(filePath, JSON.stringify(safeConfig, null, 2), "utf8");
   return safeConfig;
-}
-
-function getConfigPath(app) {
-  return path.join(app.getPath("userData"), "voice-control-config.json");
 }
 
 function sanitizeConfig(input) {
@@ -65,7 +76,9 @@ function isObject(value) {
 
 module.exports = {
   DEFAULT_CONFIG,
+  getConfigPath,
   loadConfig,
+  resolveUserDataDir,
   saveConfig,
   sanitizeConfig
 };

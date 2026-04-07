@@ -19,22 +19,25 @@ const fields = {
 init().catch((err) => appendLog({ level: "error", message: err.message || String(err) }));
 
 async function init() {
-  const state = await window.voiceControlApi.getState();
-  setForm(state.config);
-  setRunning(state.running);
+  const tauriApi = ensureTauriApi();
+  const state = await tauriApi.invoke("vc_get_state");
+  setForm(state.config || {});
+  setRunning(Boolean(state.running));
+
   if (Array.isArray(state.logs)) {
     for (const item of state.logs) {
       appendLog(item);
     }
   }
 
-  window.voiceControlApi.onLog((item) => {
-    appendLog(item);
+  await tauriApi.listen("vc:log", (event) => {
+    appendLog(event.payload || {});
   });
 
-  window.voiceControlApi.onState((statePayload) => {
-    if (typeof statePayload.running === "boolean") {
-      setRunning(statePayload.running);
+  await tauriApi.listen("vc:state", (event) => {
+    const payload = event.payload || {};
+    if (typeof payload.running === "boolean") {
+      setRunning(payload.running);
     }
   });
 }
@@ -49,20 +52,23 @@ saveBtn.addEventListener("click", async () => {
 });
 
 startBtn.addEventListener("click", async () => {
+  const tauriApi = ensureTauriApi();
   await saveConfig();
-  const state = await window.voiceControlApi.start();
-  setRunning(state.running);
+  const state = await tauriApi.invoke("vc_start");
+  setRunning(Boolean(state.running));
 });
 
 stopBtn.addEventListener("click", async () => {
-  const state = await window.voiceControlApi.stop();
-  setRunning(state.running);
+  const tauriApi = ensureTauriApi();
+  const state = await tauriApi.invoke("vc_stop");
+  setRunning(Boolean(state.running));
 });
 
 async function saveConfig() {
+  const tauriApi = ensureTauriApi();
   const payload = readForm();
-  const state = await window.voiceControlApi.saveConfig(payload);
-  setForm(state.config);
+  const state = await tauriApi.invoke("vc_save_config", { payload });
+  setForm(state.config || {});
   appendLog({ level: "info", message: "配置已保存" });
 }
 
@@ -99,4 +105,16 @@ function appendLog(item) {
   const ts = item.ts ? new Date(item.ts).toLocaleTimeString() : new Date().toLocaleTimeString();
   line.textContent = `[${ts}] [${item.level || "info"}] ${item.message || ""}`;
   logsEl.prepend(line);
+}
+
+function ensureTauriApi() {
+  const globalTauri = window.__TAURI__;
+  if (!globalTauri || !globalTauri.tauri || !globalTauri.event) {
+    throw new Error("Tauri API 不可用，请通过 Tauri 容器启动应用。");
+  }
+
+  return {
+    invoke: globalTauri.tauri.invoke,
+    listen: globalTauri.event.listen
+  };
 }

@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { sanitizeConfig } = require("../node-src/electron/configStore");
+const { sanitizeConfig } = require("../node-src/tauri/configStore");
 
 test("sanitizeConfig applies defaults and trims strings", () => {
   const config = sanitizeConfig({

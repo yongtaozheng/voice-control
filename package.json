@@ -1,21 +1,24 @@
 {
   "name": "voice-control-node",
   "version": "0.1.0",
-  "description": "Windows desktop voice control MVP for media playback",
+  "description": "Windows desktop voice control MVP with Tauri shell",
   "private": true,
-  "main": "node-src/electron/main.js",
   "scripts": {
     "start": "node node-src/cli.js",
-    "desktop": "electron node-src/electron/main.js",
+    "desktop": "npm run tauri:dev",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
     "test": "node --test tests/*.test.js",
-    "check": "node --check node-src/cli.js && node --check node-src/core/parser.js && node --check node-src/core/engine.js && node --check node-src/executors/windowsMediaExecutor.js && node --check node-src/asr/voskStream.js && node --check node-src/utils/confidence.js && node --check node-src/service/voiceSession.js && node --check node-src/electron/configStore.js && node --check node-src/electron/preload.js && node --check node-src/electron/renderer.js && node --check node-src/electron/main.js"
+    "check": "node --check node-src/cli.js && node --check node-src/core/parser.js && node --check node-src/core/engine.js && node --check node-src/executors/windowsMediaExecutor.js && node --check node-src/asr/voskStream.js && node --check node-src/utils/confidence.js && node --check node-src/service/voiceSession.js && node --check node-src/tauri/configStore.js && node --check node-src/tauri/daemon.js && node --check node-src/tauri-ui/renderer.js"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
-    "electron": "^34.3.0",
     "mic": "^2.1.2",
     "vosk": "^0.3.39"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^1.6.3"
   }
 }

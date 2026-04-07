@@ -1,0 +1,54 @@
+{
+  "$schema": "https://schema.tauri.app/config/1",
+  "build": {
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "",
+    "withGlobalTauri": true,
+    "devPath": "../node-src/tauri-ui",
+    "distDir": "../node-src/tauri-ui"
+  },
+  "package": {
+    "productName": "Voice Control Desktop",
+    "version": "0.1.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": true
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "Voice Control Desktop",
+        "width": 960,
+        "height": 760,
+        "minWidth": 820,
+        "minHeight": 620,
+        "resizable": true
+      }
+    ],
+    "systemTray": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": false
+    },
+    "bundle": {
+      "active": true,
+      "identifier": "com.opencow.voicecontrol",
+      "targets": ["all"],
+      "resources": [
+        "../node-src",
+        "../scripts",
+        "../config",
+        "../package.json",
+        "../node_modules"
+      ],
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png"
+      ]
+    },
+    "security": {
+      "csp": null
+    }
+  }
+}
