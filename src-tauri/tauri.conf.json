@@ -33,7 +33,7 @@
     "bundle": {
       "active": true,
       "identifier": "com.opencow.voicecontrol",
-      "targets": ["all"],
+      "targets": "all",
       "resources": [
         "../node-src",
         "../scripts",
