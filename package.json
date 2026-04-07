@@ -14,7 +14,8 @@
   "engines": {
     "node": ">=18 <20"
   },
-  "dependencies": {
+  "dependencies": {},
+  "optionalDependencies": {
     "mic": "^2.1.2",
     "vosk": "^0.3.39"
   },

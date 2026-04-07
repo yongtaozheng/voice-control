@@ -36,6 +36,7 @@
 Windows 额外说明：
 - 需允许麦克风权限
 - 依赖 PowerShell 调用 `SendInput` 注入媒体键
+- `mic` / `vosk` 为可选依赖：在非目标平台（如 macOS arm64 CI）即使原生编译失败，`npm install` 也不会中断；Windows 使用时需确保这两个依赖安装成功
 
 ## 安装
 ```bash
