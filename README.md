@@ -28,7 +28,7 @@
 - `.github/workflows/build.yml`：CI/CD 工作流
 
 ## 环境要求
-- Node.js >= 18
+- Node.js 18.x（推荐 18 LTS；当前不建议 20+，`ffi-napi` 在部分 darwin arm64 环境编译失败）
 - Rust stable（Tauri 构建需要）
 - Tauri 运行时依赖（按系统安装）
 - 麦克风设备

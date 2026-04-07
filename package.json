@@ -12,7 +12,7 @@
     "check": "node --check node-src/cli.js && node --check node-src/core/parser.js && node --check node-src/core/engine.js && node --check node-src/executors/windowsMediaExecutor.js && node --check node-src/asr/voskStream.js && node --check node-src/utils/confidence.js && node --check node-src/service/voiceSession.js && node --check node-src/tauri/configStore.js && node --check node-src/tauri/daemon.js && node --check node-src/tauri-ui/renderer.js"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=18 <20"
   },
   "dependencies": {
     "mic": "^2.1.2",
