@@ -84,13 +84,12 @@ jobs:
             libgtk-3-dev \
             libayatana-appindicator3-dev
 
-      - name: Install dependencies (Windows)
-        if: matrix.target == 'win'
-        run: npm install
+      - name: Install dependencies
+        run: npm install --ignore-scripts
 
-      - name: Install dependencies (non-Windows)
-        if: matrix.target != 'win'
-        run: npm install --omit=optional
+      - name: Rebuild native modules (Windows only)
+        if: matrix.target == 'win'
+        run: npm rebuild
 
       - name: Build Tauri app (macOS)
         if: matrix.target == 'mac'
