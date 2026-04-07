@@ -9,9 +9,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use tauri::{
-    AppHandle, CustomMenuItem, Manager, RunEvent, SystemTray, SystemTrayEvent, SystemTrayMenu,
-};
+use tauri::{AppHandle, CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu};
 
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(20);
 
@@ -457,15 +455,6 @@ fn main() {
                     if !state.daemon.is_quitting() {
                         api.prevent_close();
                         let _ = event.window().hide();
-                    }
-                }
-            }
-        })
-        .on_run_event(|app, event| {
-            if matches!(event, RunEvent::Exit | RunEvent::ExitRequested { .. }) {
-                if let Some(state) = app.try_state::<AppState>() {
-                    if !state.daemon.is_quitting() {
-                        state.daemon.shutdown();
                     }
                 }
             }
