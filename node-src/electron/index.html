@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Voice Control Desktop</title>
+    <style>
+      :root {
+        --bg: #faf9f5;
+        --text: #141413;
+        --muted: #5d5a52;
+        --line: #e8e6dc;
+        --accent: #d97757;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Arial, sans-serif;
+        background: linear-gradient(180deg, #faf9f5 0%, #f3f1e8 100%);
+        color: var(--text);
+      }
+
+      main {
+        width: min(920px, 100%);
+        margin: 0 auto;
+        padding: 20px;
+      }
+
+      h1 {
+        margin: 0 0 10px;
+        font-size: 22px;
+      }
+
+      .status-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+
+      .status {
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 13px;
+        border: 1px solid var(--line);
+        background: #fff;
+      }
+
+      .status.running {
+        color: #1f5e35;
+        border-color: #8bbb9c;
+      }
+
+      .status.stopped {
+        color: #7c3f2a;
+        border-color: #d2a08d;
+      }
+
+      .panel {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      label {
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      input {
+        border: 1px solid #d7d3c6;
+        border-radius: 8px;
+        padding: 9px 10px;
+        font-size: 14px;
+        background: #fff;
+      }
+
+      .full {
+        grid-column: 1 / -1;
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      button {
+        border: 1px solid #d7d3c6;
+        background: #fff;
+        color: var(--text);
+        padding: 8px 14px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+
+      button.primary {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: #fff;
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      #logs {
+        max-height: 300px;
+        overflow: auto;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px;
+        background: #fbfbf8;
+      }
+
+      .log {
+        padding: 2px 0;
+      }
+
+      .log.error {
+        color: #a12929;
+      }
+
+      .log.ok {
+        color: #1f5e35;
+      }
+
+      .log.skip {
+        color: #7c6a2a;
+      }
+
+      @media (max-width: 720px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Voice Control Desktop</h1>
+
+      <div class="status-row">
+        <span>状态：</span>
+        <span id="status" class="status stopped">已停止</span>
+      </div>
+
+      <section class="panel">
+        <form id="settings-form">
+          <div class="grid">
+            <div class="field full">
+              <label for="modelPath">Vosk 模型路径</label>
+              <input id="modelPath" type="text" placeholder="C:\\models\\vosk-model-small-cn-0.22" required />
+            </div>
+
+            <div class="field">
+              <label for="wakeWord">唤醒词（可空）</label>
+              <input id="wakeWord" type="text" placeholder="音乐助手" />
+            </div>
+
+            <div class="field">
+              <label for="sampleRate">采样率</label>
+              <input id="sampleRate" type="number" min="8000" max="48000" step="1000" value="16000" />
+            </div>
+
+            <div class="field">
+              <label for="confidenceThreshold">置信度阈值（0-1）</label>
+              <input id="confidenceThreshold" type="number" min="0" max="1" step="0.01" value="0.55" />
+            </div>
+
+            <div class="field">
+              <label for="device">输入设备（可空）</label>
+              <input id="device" type="text" placeholder="默认设备" />
+            </div>
+
+            <div class="field full">
+              <label for="phraseMapFile">短语配置文件（可空）</label>
+              <input id="phraseMapFile" type="text" placeholder="config/phrases.example.json" />
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="save-btn" type="button">保存配置</button>
+            <button id="start-btn" type="button" class="primary">启动监听</button>
+            <button id="stop-btn" type="button" disabled>停止监听</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel">
+        <strong>运行日志</strong>
+        <div id="logs"></div>
+      </section>
+    </main>
+
+    <script src="./renderer.js"></script>
+  </body>
+</html>

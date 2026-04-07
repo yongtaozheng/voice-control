@@ -1,0 +1,169 @@
+name: Build Desktop App
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  ci:
+    name: CI Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run checks
+        run: npm run check
+
+      - name: Run tests
+        run: npm test
+
+  build:
+    needs: ci
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-13
+            target: mac
+            arch: x64
+            label: macOS-x64
+          - platform: macos-14
+            target: mac
+            arch: arm64
+            label: macOS-ARM64
+          - platform: windows-latest
+            target: win
+            arch: x64
+            label: Windows-x64
+          - platform: ubuntu-22.04
+            target: linux
+            arch: x64
+            label: Linux-x64
+
+    runs-on: ${{ matrix.platform }}
+    name: Build (${{ matrix.label }})
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libarchive-tools \
+            rpm \
+            fakeroot \
+            dpkg \
+            libfuse2
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Electron app (macOS)
+        if: matrix.target == 'mac'
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npx electron-builder --mac dmg zip --${{ matrix.arch }} --publish never
+
+      - name: Build Electron app (Windows)
+        if: matrix.target == 'win'
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npx electron-builder --win nsis portable --${{ matrix.arch }} --publish never
+
+      - name: Build Electron app (Linux)
+        if: matrix.target == 'linux'
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npx electron-builder --linux AppImage deb rpm --${{ matrix.arch }} --publish never
+
+      - name: List bundle outputs
+        shell: bash
+        run: |
+          echo "=== dist directory ==="
+          find dist -type f 2>/dev/null || echo "No dist outputs found"
+
+      - name: Upload artifacts (macOS)
+        if: matrix.target == 'mac'
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ matrix.label }}
+          path: |
+            dist/*.dmg
+            dist/*.zip
+          if-no-files-found: warn
+
+      - name: Upload artifacts (Windows)
+        if: matrix.target == 'win'
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ matrix.label }}
+          path: |
+            dist/*.exe
+            dist/*.msi
+          if-no-files-found: warn
+
+      - name: Upload artifacts (Linux)
+        if: matrix.target == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ matrix.label }}
+          path: |
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.rpm
+          if-no-files-found: warn
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    name: Create Release
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List all downloaded artifacts
+        run: find artifacts -type f || echo "No artifacts found"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.zip
+            artifacts/**/*.exe
+            artifacts/**/*.msi
+            artifacts/**/*.deb
+            artifacts/**/*.AppImage
+            artifacts/**/*.rpm
