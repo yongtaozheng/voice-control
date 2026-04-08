@@ -14,7 +14,7 @@ use tauri::{AppHandle, CustomMenuItem, Manager, SystemTray, SystemTrayEvent, Sys
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(20);
 
 struct AppState {
-    daemon: Arc<DaemonManager>,
+    daemon: Option<Arc<DaemonManager>>,
 }
 
 struct DaemonManager {
@@ -29,14 +29,7 @@ impl DaemonManager {
     fn spawn(app: &AppHandle) -> Result<Self, String> {
         let script_path = resolve_daemon_script_path(app)?;
         let cwd = resolve_project_root(&script_path).ok_or("cannot resolve project root")?;
-
-        let node_bin = std::env::var("VC_NODE_BIN").unwrap_or_else(|_| {
-            if cfg!(target_os = "windows") {
-                "node.exe".to_string()
-            } else {
-                "node".to_string()
-            }
-        });
+        let node_bin = resolve_node_bin(app);
 
         let app_data_dir = app
             .path_resolver()
@@ -325,6 +318,33 @@ fn resolve_project_root(script_path: &PathBuf) -> Option<PathBuf> {
         .map(|p| p.to_path_buf())
 }
 
+fn resolve_node_bin(app: &AppHandle) -> String {
+    if let Ok(raw) = std::env::var("VC_NODE_BIN") {
+        let trimmed = raw.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+
+    if cfg!(target_os = "windows") {
+        if let Some(resource_dir) = app.path_resolver().resource_dir() {
+            let candidates = [
+                resource_dir.join("node.exe"),
+                resource_dir.join("node").join("node.exe"),
+                resource_dir.join("runtime").join("node.exe"),
+            ];
+            for candidate in candidates {
+                if candidate.exists() {
+                    return candidate.to_string_lossy().to_string();
+                }
+            }
+        }
+        return "node.exe".to_string();
+    }
+
+    "node".to_string()
+}
+
 fn emit_log(app: &AppHandle, level: &str, message: impl Into<String>) {
     let payload = json!({
       "ts": now_unix_ms(),
@@ -350,17 +370,29 @@ fn update_tray_running(app: &AppHandle, running: bool) {
 
 #[tauri::command]
 fn vc_get_state(state: tauri::State<AppState>) -> Result<Value, String> {
-    state.daemon.request("get_state", Value::Null)
+    let daemon = state
+        .daemon
+        .as_ref()
+        .ok_or("daemon unavailable: failed to start Node runtime")?;
+    daemon.request("get_state", Value::Null)
 }
 
 #[tauri::command]
 fn vc_save_config(state: tauri::State<AppState>, payload: Value) -> Result<Value, String> {
-    state.daemon.request("save_config", payload)
+    let daemon = state
+        .daemon
+        .as_ref()
+        .ok_or("daemon unavailable: failed to start Node runtime")?;
+    daemon.request("save_config", payload)
 }
 
 #[tauri::command]
 fn vc_start(app: AppHandle, state: tauri::State<AppState>) -> Result<Value, String> {
-    let data = state.daemon.request("start", Value::Null)?;
+    let daemon = state
+        .daemon
+        .as_ref()
+        .ok_or("daemon unavailable: failed to start Node runtime")?;
+    let data = daemon.request("start", Value::Null)?;
     if let Some(running) = data.get("running").and_then(Value::as_bool) {
         update_tray_running(&app, running);
     }
@@ -369,7 +401,11 @@ fn vc_start(app: AppHandle, state: tauri::State<AppState>) -> Result<Value, Stri
 
 #[tauri::command]
 fn vc_stop(app: AppHandle, state: tauri::State<AppState>) -> Result<Value, String> {
-    let data = state.daemon.request("stop", Value::Null)?;
+    let daemon = state
+        .daemon
+        .as_ref()
+        .ok_or("daemon unavailable: failed to start Node runtime")?;
+    let data = daemon.request("stop", Value::Null)?;
     if let Some(running) = data.get("running").and_then(Value::as_bool) {
         update_tray_running(&app, running);
     }
@@ -389,15 +425,28 @@ fn main() {
         .system_tray(SystemTray::new().with_menu(tray_menu))
         .setup(|app| {
             let app_handle = app.handle();
-            let daemon = DaemonManager::spawn(&app_handle)
-                .map_err(|err| -> Box<dyn std::error::Error> { err.into() })?;
-            let daemon = Arc::new(daemon);
-
-            if let Ok(data) = daemon.request("get_state", Value::Null) {
-                if let Some(running) = data.get("running").and_then(Value::as_bool) {
-                    update_tray_running(&app_handle, running);
+            let daemon = match DaemonManager::spawn(&app_handle) {
+                Ok(daemon) => {
+                    let daemon = Arc::new(daemon);
+                    if let Ok(data) = daemon.request("get_state", Value::Null) {
+                        if let Some(running) = data.get("running").and_then(Value::as_bool) {
+                            update_tray_running(&app_handle, running);
+                        }
+                    }
+                    Some(daemon)
                 }
-            }
+                Err(err) => {
+                    emit_log(
+                        &app_handle,
+                        "error",
+                        format!(
+                            "daemon startup failed: {err}. App stays open; set VC_NODE_BIN or install Node.js 18.x"
+                        ),
+                    );
+                    update_tray_running(&app_handle, false);
+                    None
+                }
+            };
 
             app.manage(AppState { daemon });
             Ok(())
@@ -413,35 +462,55 @@ fn main() {
                     }
                     "start" => {
                         if let Some(state) = app.try_state::<AppState>() {
-                            match state.daemon.request("start", Value::Null) {
-                                Ok(data) => {
-                                    if let Some(running) =
-                                        data.get("running").and_then(Value::as_bool)
-                                    {
-                                        update_tray_running(app, running);
+                            if let Some(daemon) = state.daemon.as_ref() {
+                                match daemon.request("start", Value::Null) {
+                                    Ok(data) => {
+                                        if let Some(running) =
+                                            data.get("running").and_then(Value::as_bool)
+                                        {
+                                            update_tray_running(app, running);
+                                        }
+                                    }
+                                    Err(err) => {
+                                        emit_log(app, "error", format!("start failed: {err}"))
                                     }
                                 }
-                                Err(err) => emit_log(app, "error", format!("start failed: {err}")),
+                            } else {
+                                emit_log(
+                                    app,
+                                    "error",
+                                    "start failed: daemon unavailable (check Node.js 18.x / VC_NODE_BIN)",
+                                );
                             }
                         }
                     }
                     "stop" => {
                         if let Some(state) = app.try_state::<AppState>() {
-                            match state.daemon.request("stop", Value::Null) {
-                                Ok(data) => {
-                                    if let Some(running) =
-                                        data.get("running").and_then(Value::as_bool)
-                                    {
-                                        update_tray_running(app, running);
+                            if let Some(daemon) = state.daemon.as_ref() {
+                                match daemon.request("stop", Value::Null) {
+                                    Ok(data) => {
+                                        if let Some(running) =
+                                            data.get("running").and_then(Value::as_bool)
+                                        {
+                                            update_tray_running(app, running);
+                                        }
                                     }
+                                    Err(err) => emit_log(app, "error", format!("stop failed: {err}")),
                                 }
-                                Err(err) => emit_log(app, "error", format!("stop failed: {err}")),
+                            } else {
+                                emit_log(
+                                    app,
+                                    "error",
+                                    "stop failed: daemon unavailable (check Node.js 18.x / VC_NODE_BIN)",
+                                );
                             }
                         }
                     }
                     "quit" => {
                         if let Some(state) = app.try_state::<AppState>() {
-                            state.daemon.shutdown();
+                            if let Some(daemon) = state.daemon.as_ref() {
+                                daemon.shutdown();
+                            }
                         }
                         app.exit(0);
                     }
@@ -452,7 +521,12 @@ fn main() {
         .on_window_event(|event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event.event() {
                 if let Some(state) = event.window().app_handle().try_state::<AppState>() {
-                    if !state.daemon.is_quitting() {
+                    let quitting = state
+                        .daemon
+                        .as_ref()
+                        .map(|daemon| daemon.is_quitting())
+                        .unwrap_or(false);
+                    if !quitting {
                         api.prevent_close();
                         let _ = event.window().hide();
                     }
